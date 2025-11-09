@@ -1,5 +1,6 @@
 import socket
 import ssl
+import tkinter
 
 class URL:
   def __init__(self, url):
@@ -70,7 +71,8 @@ class URL:
     s.close() # 소켓 닫기
     return body
   
-def show(body):
+def lex(body):
+  text = ""
   in_tag = False
   for c in body:
     if c == "<":
@@ -78,14 +80,64 @@ def show(body):
     elif c == ">":
       in_tag = False
     elif not in_tag:
-      print(c, end="") # 태그 안에 있지 않은 문자만 출력
+      text += c
+  return text
 
-# 웹페이지 로드
-def load(url):
-  body = url.request()
-  show(body)
+WIDTH, HEIGHT = 800, 600
+HSTEP, VSTEP = 13, 18
+SCROLL_STEP = 100
+
+def layout(text):
+  display_list = []
+  cursor_x, cursor_y = HSTEP, VSTEP
+  for c in text:
+    display_list.append((cursor_x, cursor_y, c))
+    cursor_x += HSTEP
+
+    # 줄 바꿈 처리
+    if cursor_x >= WIDTH - HSTEP:
+      cursor_y += VSTEP
+      cursor_x = HSTEP
+  
+  return display_list
+
+class Browser: 
+  def __init__(self):
+    self.window = tkinter.Tk()
+    self.canvas = tkinter.Canvas(
+      self.window, 
+      width=WIDTH, 
+      height=HEIGHT
+    )
+    self.canvas.pack()
+
+    # 스크롤
+    self.scroll = 0 # 스크롤한 거리
+    self.window.bind("<Down>", self.scrolldown) # 아래 화살표 키 바인딩
+
+  def load(self, url):
+    body = url.request()
+    text = lex(body)
+    self.display_list = layout(text)
+    self.draw()   
+  
+  def draw(self):
+    self.canvas.delete("all") # 캔버스 초기화
+    for x, y, c in self.display_list:
+      # 보이지 않는 부분은 그리지 않음
+      if y > self.scroll + HEIGHT: continue # 창의 아래 부분
+      if y + VSTEP < self.scroll: continue # 창의 위의 부분
+
+      # 그리기
+      self.canvas.create_text(x, y - self.scroll, text=c)
+  
+  # 아래로 스크롤 이벤트 핸들러
+  def scrolldown(self, e):
+    self.scroll += SCROLL_STEP
+    self.draw()
 
 # 커맨드 라인에서 실행할 때 load 함수 실행
 if __name__ == "__main__":
   import sys
-  load(URL(sys.argv[1])) # 커맨드 라인 인수를 URL 객체로 변환하여 load 함수에 전달
+  Browser().load(URL(sys.argv[1])) # 커맨드 라인 인수를 URL 객체로 변환하여 load 함수에 전달
+  tkinter.mainloop()
